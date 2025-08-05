@@ -1,0 +1,9 @@
+flask
+opencv-python
+numpy
+pyttsx3
+tensorflow
+scikit-learn
+pillow
+gTTS
+pygame

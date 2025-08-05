@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Kannada Sign Language Recognition</title>
+  <style>
+    body {
+      background: #121212;
+      color: #f1f1f1;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    #video-container {
+      position: relative;
+      margin: 20px auto;
+      width: 100%;
+      max-width: 640px;
+    }
+    #webcam {
+      width: 100%;
+      height: auto;
+      border: 2px solid #333;
+      border-radius: 10px;
+    }
+    #canvas {
+      display: none;
+    }
+    .controls {
+      margin: 20px 0;
+    }
+    button {
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 18px;
+      background-color: #1f1f1f;
+      color: white;
+      border: 1px solid #333;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover:not(:disabled) {
+      background-color: #333;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    select {
+      font-size: 18px;
+      padding: 8px;
+      margin: 10px;
+      background-color: #1f1f1f;
+      color: white;
+      border: 1px solid #333;
+      border-radius: 5px;
+    }
+    #result {
+      font-size: 28px;
+      margin: 20px 0;
+      padding: 15px;
+      background-color: #1a1a1a;
+      border-radius: 10px;
+      min-height: 50px;
+    }
+    .loading {
+      color: #ffd700;
+    }
+    .error {
+      color: #ff6b6b;
+    }
+    .success {
+      color: #4ecdc4;
+    }
+    #audio-player {
+      margin-top: 20px;
+    }
+    .status {
+      margin: 10px 0;
+      font-size: 16px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ಕನ್ನಡ ಸೈನ್ ಲಾಂಗ್ವೇಜ್ ಗುರುತಿಸುವಿಕೆ</h1>
+    <h2>Kannada Sign Language Recognition</h2>
+    
+    <div id="video-container">
+      <video id="webcam" autoplay muted playsinline></video>
+      <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+
+    <div class="status" id="status">Initializing camera...</div>
+
+    <div class="controls">
+      <select id="mode">
+        <option value="alphabet">ಅಕ್ಷರ (Alphabet)</option>
+        <option value="word">ಪದ (Word)</option>
+      </select>
+      <br>
+      <button id="start-camera">Start Camera</button>
+      <button id="capture" disabled>Capture Sign</button>
+      <button id="stop-camera" disabled>Stop Camera</button>
+    </div>
+
+    <div id="result"></div>
+    <audio id="audio-player" controls style="display: none;"></audio>
+  </div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('start-camera');
+    const captureBtn = document.getElementById('capture');
+    const stopBtn = document.getElementById('stop-camera');
+    const modeSelect = document.getElementById('mode');
+    const resultDiv = document.getElementById('result');
+    const audioPlayer = document.getElementById('audio-player');
+    const statusDiv = document.getElementById('status');
+
+    let stream = null;
+
+    // Start camera
+    startBtn.onclick = async () => {
+      try {
+        statusDiv.textContent = "Requesting camera access...";
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          } 
+        });
+        
+        video.srcObject = stream;
+        startBtn.disabled = true;
+        captureBtn.disabled = false;
+        stopBtn.disabled = false;
+        statusDiv.textContent = "Camera ready! Position your hand in the frame.";
+        
+        // Wait for video to load
+        video.onloadedmetadata = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        };
+        
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        statusDiv.textContent = "Error: Could not access camera. Please check permissions.";
+        statusDiv.className = "status error";
+      }
+    };
+
+    // Capture image
+    captureBtn.onclick = async () => {
+      if (!stream) return;
+      
+      statusDiv.textContent = "Capturing and analyzing...";
+      statusDiv.className = "status loading";
+      resultDiv.textContent = "Processing...";
+      resultDiv.className = "loading";
+      
+      // Draw current video frame to canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+        // Convert canvas to blob
+        canvas.toBlob(async (blob) => {
+          const formData = new FormData();
+          formData.append('mode', modeSelect.value);
+          formData.append('image', blob, 'capture.jpg');
+          
+          try {
+            const response = await fetch('/predict', {
+              method: 'POST',
+              body: formData
+            });
+          
+          const data = await response.json();
+          
+          if (data.error) {
+            resultDiv.textContent = "Error: " + data.error;
+            resultDiv.className = "error";
+            statusDiv.textContent = "Error occurred during prediction";
+            statusDiv.className = "status error";
+          } else {
+            resultDiv.textContent = "ಗುರುತಿಸಿದೆ: " + data.prediction;
+            resultDiv.className = "success";
+            statusDiv.textContent = "Prediction complete!";
+            statusDiv.className = "status";
+            
+            // Play audio
+            if (data.audio) {
+              audioPlayer.src = "data:audio/mp3;base64," + data.audio;
+              audioPlayer.style.display = "block";
+              audioPlayer.play();
+            }
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          resultDiv.textContent = "Error: Could not connect to server";
+          resultDiv.className = "error";
+          statusDiv.textContent = "Connection error";
+          statusDiv.className = "status error";
+        }
+      }, 'image/jpeg');
+    };
+
+    // Stop camera
+    stopBtn.onclick = () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        stream = null;
+      }
+      
+      startBtn.disabled = false;
+      captureBtn.disabled = true;
+      stopBtn.disabled = true;
+      statusDiv.textContent = "Camera stopped";
+      statusDiv.className = "status";
+    };
+
+    // Handle page unload
+    window.addEventListener('beforeunload', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    });
+  </script>
+</body>
+</html>
