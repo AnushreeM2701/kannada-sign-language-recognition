@@ -1,15 +1,17 @@
 from flask import Flask, render_template, request, jsonify
 import cv2
 import numpy as np
+import tensorflow as tf
 import os
 from gtts import gTTS
-from fix_opencv_exceptions import OpenCVFixer  # Import the fixer class
 from tempfile import NamedTemporaryFile
 import base64
 import logging
 import time
 
 from scripts.predict_updated import predict_word_sequence
+from scripts.cnn_predict_fixed import safe_predict
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,9 +24,32 @@ MAX_CAPTURE_FRAMES = 10
 CAMERA_TIMEOUT = 30  # seconds
 VALID_MODES = ['alphabet', 'word']
 
-# Initialize the OpenCVFixer and get the safe_predict function
-fixer = OpenCVFixer()
-safe_predict = fixer.create_safe_prediction_function()
+# CNN-specific constants
+IMG_SIZE = 64
+NUM_CHANNELS = 3
+
+# Load CNN models and label maps
+MODEL_DIR = "models"
+ALPHABET_MODEL_PATH = os.path.join(MODEL_DIR, "alphabet_model.keras")
+WORD_MODEL_PATH = os.path.join(MODEL_DIR, "word_model.keras")
+ALPHABET_LABEL_MAP_PATH = os.path.join(MODEL_DIR, "alphabet_label_map.json")
+WORD_LABEL_MAP_PATH = os.path.join(MODEL_DIR, "word_label_map.json")
+
+# Load models at startup
+logger.info("Loading CNN models...")
+alphabet_model = tf.keras.models.load_model(ALPHABET_MODEL_PATH)
+word_model = tf.keras.models.load_model(WORD_MODEL_PATH)
+
+# Load label maps
+with open(ALPHABET_LABEL_MAP_PATH, 'r', encoding='utf-8') as f:
+    alphabet_label_map = json.load(f)
+    alphabet_reverse_map = {v: k for k, v in alphabet_label_map.items()}
+
+with open(WORD_LABEL_MAP_PATH, 'r', encoding='utf-8') as f:
+    word_label_map = json.load(f)
+    word_reverse_map = {v: k for k, v in word_label_map.items()}
+
+logger.info("✅ CNN models loaded successfully")
 
 @app.route('/')
 def index():

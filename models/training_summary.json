@@ -1,7 +1,11 @@
 {
-  "accuracy": 0.9823529411764705,
-  "num_classes": 34,
-  "image_size": 64,
-  "model_type": "RandomForestClassifier",
-  "training_date": "2025-08-05"
+  "model_type": "CNN",
+  "input_shape": [
+    64,
+    64,
+    3
+  ],
+  "epochs": 20,
+  "test_accuracy": 0.9779411554336548,
+  "trained_on": "2025-08-06 11:18:37.020469"
 }

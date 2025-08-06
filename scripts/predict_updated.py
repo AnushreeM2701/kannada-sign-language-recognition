@@ -1,90 +1,75 @@
 #!/usr/bin/env python3
 """
-Updated prediction script using the retrained model
-Fixes preprocessing inconsistencies and model loading issues
+Updated prediction script using CNN models
+Handles image preprocessing for CNN models
 """
 
 import cv2
 import numpy as np
-import joblib
+import tensorflow as tf
 import json
 import os
 
-# Global variables for models
+# Global variables for CNN models
 alphabet_model = None
-alphabet_scaler = None
 alphabet_labels = None
 word_model = None
-word_scaler = None
 word_labels = None
 
 def load_models():
-    """Load the retrained models with comprehensive error handling"""
-    global alphabet_model, alphabet_scaler, alphabet_labels
+    """Load CNN models with comprehensive error handling"""
+    global alphabet_model, alphabet_labels, word_model, word_labels
     
     try:
-        # Define model paths with fallbacks
+        # Define model paths
         model_configs = [
             {
-                'model': 'models/alphabet_model_retrained.pkl',
-                'scaler': 'models/alphabet_scaler_retrained.pkl',
-                'labels': 'models/alphabet_label_map_retrained.json',
-                'name': 'retrained'
+                'model': 'models/alphabet_model.keras',
+                'labels': 'models/alphabet_label_map.json',
+                'name': 'alphabet'
             },
             {
-                'model': 'models/alphabet_model_lightweight.pkl',
-                'scaler': 'models/alphabet_scaler.pkl',
-                'labels': 'utils/label_map.json',
-                'name': 'lightweight'
+                'model': 'models/word_model.keras',
+                'labels': 'models/word_label_map.json',
+                'name': 'word'
             }
         ]
         
         for config in model_configs:
             try:
                 model_path = config['model']
-                scaler_path = config['scaler']
                 label_map_path = config['labels']
                 
                 # Check if files exist
-                missing_files = []
-                for file_path, file_type in [(model_path, 'model'), (scaler_path, 'scaler'), (label_map_path, 'labels')]:
-                    if not os.path.exists(file_path):
-                        missing_files.append(f"{file_type} ({file_path})")
-                
-                if missing_files:
-                    print(f"⚠️  Missing {config['name']} files: {', '.join(missing_files)}")
+                if not os.path.exists(model_path):
+                    print(f"⚠️  Missing {config['name']} model: {model_path}")
                     continue
                 
-                # Load models
-                print(f"📂 Loading {config['name']} models...")
-                alphabet_model = joblib.load(model_path)
-                alphabet_scaler = joblib.load(scaler_path)
+                # Load CNN model
+                print(f"📂 Loading {config['name']} CNN model...")
+                if config['name'] == 'alphabet':
+                    alphabet_model = tf.keras.models.load_model(model_path)
+                else:
+                    word_model = tf.keras.models.load_model(model_path)
                 
                 # Load label mapping
                 with open(label_map_path, 'r', encoding='utf-8') as f:
                     label_map = json.load(f)
-                    alphabet_labels = {v: k for k, v in label_map.items()}
+                    if config['name'] == 'alphabet':
+                        alphabet_labels = {v: k for k, v in label_map.items()}
+                    else:
+                        word_labels = {v: k for k, v in label_map.items()}
                 
-                # Validate loaded models
-                if alphabet_model is None or alphabet_scaler is None:
-                    raise ValueError("Failed to load model or scaler")
-                
-                if not alphabet_labels:
-                    raise ValueError("No labels loaded")
-                
-                print(f"✅ Successfully loaded {config['name']} model with {len(alphabet_labels)} classes")
-                return True
+                print(f"✅ Successfully loaded {config['name']} CNN model with {len(label_map)} classes")
                 
             except Exception as e:
-                print(f"❌ Failed to load {config['name']} models: {e}")
+                print(f"❌ Failed to load {config['name']} CNN model: {e}")
                 continue
         
-        # If we get here, all model loading attempts failed
-        print("❌ All model loading attempts failed")
-        return False
+        return True
         
     except Exception as e:
-        print(f"❌ Critical error loading models: {e}")
+        print(f"❌ Critical error loading CNN models: {e}")
         return False
 
 def preprocess_image(image, target_size=64):
