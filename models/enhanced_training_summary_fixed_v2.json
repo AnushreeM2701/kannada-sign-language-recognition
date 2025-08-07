@@ -1,0 +1,15 @@
+{
+  "started_at": "2025-08-07 19:56:46.003474",
+  "data_dir": "data",
+  "model_dir": "models",
+  "epochs": 50,
+  "version": "fixed_v2",
+  "alphabet_training": {
+    "status": "completed",
+    "completed_at": "2025-08-07 21:00:13.318914"
+  },
+  "word_training": {
+    "status": "skipped",
+    "reason": "word training module not found"
+  }
+}
